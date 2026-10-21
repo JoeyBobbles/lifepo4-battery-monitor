@@ -29,4 +29,4 @@ jobs:
           arduino-cli core install arduino:avr@1.8.8
           arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4"
       - name: Compile Nano firmware
-        run: arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 src/firmware
+        run: arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware

@@ -31,25 +31,24 @@ implemented, but runtime estimates are not output to either display or serial.
 
 The 10 A calibration setting is not a verified safe continuous-current rating.
 Confirm the actual breakout, shunt rating, signal levels, supply current and
-common ground before wiring. See [hardware notes](battery-monitor/README.md).
+common ground before wiring. See [hardware notes](docs/HARDWARE.md).
 The schematic is a breadboard prototype; the PCB file is an empty placeholder.
 
 ## Files and schematics
 
 ```text
-src/firmware/                       Arduino sketch directory
-battery-monitor/hardware/
-  schematic_breadboard/             KiCad 9 project, schematic and empty PCB
-battery-monitor/docs/               Rendered SVG schematic
+firmware/                          Arduino sketch directory
+hardware/                          KiCad 9 project, schematic and empty PCB
+docs/                              Hardware notes, SVG schematic and release audit
 .github/workflows/firmware.yml      Nano compilation check
 ```
 
-Firmware lives in [`src/`](src/); open
-[`src/firmware/firmware.ino`](src/firmware/firmware.ino) in Arduino IDE.
+Firmware lives in [`firmware/`](firmware/); open
+[`firmware/firmware.ino`](firmware/firmware.ino) in Arduino IDE.
 
-- [KiCad project](battery-monitor/hardware/schematic_breadboard/schematic_breadboard.kicad_pro)
-- [KiCad schematic](battery-monitor/hardware/schematic_breadboard/schematic_breadboard.kicad_sch)
-- [Rendered SVG diagram](battery-monitor/docs/schematic_breadboard.svg)
+- [KiCad project](hardware/schematic_breadboard.kicad_pro)
+- [KiCad schematic](hardware/schematic_breadboard.kicad_sch)
+- [Rendered SVG diagram](docs/schematic_breadboard.svg)
 
 Use KiCad 9 or a compatible newer version. All five used symbols are embedded
 in the schematic; no custom symbol library is required. Standard KiCad libraries
@@ -57,7 +56,7 @@ provide `Module:Arduino_Nano` and `Package_SO:VSSOP-10_3x3mm_P0.5mm` footprints.
 For SVG export, from the repository root:
 
 ```sh
-kicad-cli sch export svg --output /tmp/battery-monitor-svg/ battery-monitor/hardware/schematic_breadboard/schematic_breadboard.kicad_sch
+kicad-cli sch export svg --output /tmp/battery-monitor-svg/ hardware/schematic_breadboard.kicad_sch
 ```
 
 ## Build and upload
@@ -69,9 +68,9 @@ Install [Arduino CLI](https://docs.arduino.cc/arduino-cli/installation/)
 arduino-cli core update-index
 arduino-cli core install arduino:avr@1.8.8
 arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4"
-arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 src/firmware
+arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 arduino-cli board list
-arduino-cli upload --port /dev/ttyUSB0 --fqbn arduino:avr:nano:cpu=atmega328 src/firmware
+arduino-cli upload --port /dev/ttyUSB0 --fqbn arduino:avr:nano:cpu=atmega328 firmware
 ```
 
 Replace `/dev/ttyUSB0` with the detected serial port. For a Nano with the old

@@ -4,7 +4,8 @@ This repository starts with a clean initial commit containing the verified proje
 files. No prior Git history, private backups, old workflow runs or activity records
 were imported. Original project material retains the MIT licence, copyright 2026
 Joe Green. Firmware, KiCad designs and the SVG are unchanged from the verified
-release snapshot.
+release snapshot. The files are organized directly under `firmware/`,
+`hardware/` and `docs/`; the KiCad SVG export directory is `../docs/`.
 
 ## Validation
 

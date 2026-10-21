@@ -3,7 +3,7 @@
 Arduino Nano prototype for monitoring two parallel 12.8 V, 8 Ah LiFePO4 batteries.
 The [root README](../README.md) contains the current capabilities, component list,
 limitations and build/upload instructions. Firmware is in
-[`src/firmware/`](../src/firmware/).
+[`firmware/`](../firmware/).
 
 ## Hardware and power
 
@@ -29,12 +29,12 @@ power/signal wiring documentation are still planned.
 
 ## Schematics
 
-Open the [KiCad 9 project](hardware/schematic_breadboard/schematic_breadboard.kicad_pro)
-or [schematic](hardware/schematic_breadboard/schematic_breadboard.kicad_sch).
+Open the [KiCad 9 project](../hardware/schematic_breadboard.kicad_pro)
+or [schematic](../hardware/schematic_breadboard.kicad_sch).
 All used symbols are embedded. The PCB file is empty, not a routed design.
-The [SVG export](docs/schematic_breadboard.svg) is retained for review.
+The [SVG export](schematic_breadboard.svg) is retained for review.
 
-![Battery monitor schematic](docs/schematic_breadboard.svg)
+![Battery monitor schematic](schematic_breadboard.svg)
 
 ## Capacity estimate
 

@@ -13,7 +13,7 @@ Compile the entire sketch directory, including any additional source files,
 for the Arduino Nano ATmega328P before submitting a firmware change:
 
 ```sh
-arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 src/firmware
+arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 ```
 
 Use the dependencies and installation commands in [README.md](README.md).
