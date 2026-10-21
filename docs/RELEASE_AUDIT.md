@@ -16,7 +16,7 @@ asset; it should remain tracked. The PCB file is an empty placeholder.
 
 ## Sensitive information and history
 
-- Inspected all 13 initially tracked files and all three commits reachable from
+- The initial audit inspected all 13 tracked files and all three commits then reachable from
   local branches, remote-tracking refs and reflogs (23 unique blobs/commit
   objects). `git fsck --full --no-reflogs --unreachable` reported no unreachable
   objects. This covers local Git data, not unadvertised remote refs or GitHub
@@ -64,76 +64,63 @@ asset; it should remain tracked. The PCB file is an empty placeholder.
   binaries, review LGPL relinking obligations and required library/font notices;
   see [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
-## GitHub setup before publication
+## GitHub configuration — verified 2026-10-21
 
-Read-only authenticated GitHub API checks on 2026-10-21 confirmed the repository
-is private and its default branch is `main`. No remote settings were changed.
+Read-only authenticated GitHub API checks confirmed the repository remains private
+and its default branch is `main`. The maintainer enabled the active
+[Protect main ruleset](https://github.com/JoeyBobbles/lifepo4-battery-monitor/rules/25589712)
+after the initial audit. No GitHub settings or repository visibility were changed
+by the audit or this documentation update.
 
 | Protection | Observed state |
 | --- | --- |
-| Main branch protection | Disabled: protection endpoint returned “Branch not protected”; branch rules endpoint returned no rules |
-| Force pushes blocked | No branch protection/rule enforces this |
-| Branch deletion restricted | No branch protection/rule enforces this; GitHub separately prevents deleting the default branch |
-| Pull requests required | No |
-| Secret scanning | Disabled: alerts endpoint explicitly reported this |
+| Main branch protection | Active ruleset targeting the default branch |
+| Force pushes blocked | Yes: non-fast-forward updates prohibited |
+| Branch deletion restricted | Yes: deletion prohibited |
+| Pull requests required | Yes; squash merging only, zero approving reviews required |
+| Required compilation | `Compile Nano firmware`, provided by GitHub Actions |
+| Branch must be up to date | Yes: strict required status checks enabled |
+| Bypass actors | None; current administrator cannot bypass the ruleset |
+| Secret scanning | Disabled; built-in scanning is unavailable for this ordinary personally owned private repository |
 | Dependabot alerts | Enabled: vulnerability-alerts endpoint returned HTTP 204 |
 
-Keep `JoeyBobbles/lifepo4-battery-monitor` private while configuring protections.
-Review the commands below before running them; they have not been executed.
-Availability depends on the account plan and visibility.
+The zero-review policy permits a sole maintainer to merge their own pull request
+once required checks pass. Changes must still go through a pull request, including
+documentation updates. Classic branch protection is not configured separately;
+the active ruleset supplies these protections. A “Branch not protected” response
+from the classic protection endpoint does not describe the effective ruleset.
 
-After the first successful workflow run, protect `main` with pull requests,
-required compilation, no force pushes and no deletion:
+GitHub secret scanning is free for public repositories. Private organization
+repositories require an eligible GitHub Team or Enterprise Cloud plan with Secret
+Protection; ordinary personally owned private repositories are not eligible.
+See [GitHub's secret-scanning availability and setup instructions](https://docs.github.com/en/code-security/how-tos/secure-your-secrets/detect-secret-leaks/enable-secret-scanning).
+If publishing later, verify secret scanning and push protection in the settings
+available at that time. Keeping the repository private is compatible with using a
+separate local or CI scanner; none was added as part of this audit.
 
-```sh
-gh api --method PUT repos/JoeyBobbles/lifepo4-battery-monitor/branches/main/protection --input - <<'JSON'
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": ["Compile Nano firmware"]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "required_approving_review_count": 0
-  },
-  "restrictions": null,
-  "allow_force_pushes": false,
-  "allow_deletions": false
-}
-JSON
-```
+## Remaining manual release checks
 
-This requires a pull request but permits a sole maintainer to merge without an
-independent approving review. Choose a different approval policy if desired.
-Alternatively configure an active ruleset in Settings → Rules → Rulesets.
+- Open the schematic in KiCad 9 and verify a fresh SVG export; KiCad CLI was
+  unavailable during the audit. See [README.md](../README.md) for the command.
+- Complete firmware upload, electrical rule checking and hardware bench
+  validation before describing the prototype as electrically validated.
+- Before distributing compiled firmware, review the LGPL relinking obligations
+  and required library/font notices in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+- Recheck the protections and applicable secret-scanning options before publication.
+  Dependabot alerts do not replace manual Arduino dependency review.
 
-Dependabot alerts are already enabled. The first command below can re-enable
-them if needed; enable secret scanning/push protection where available:
+The required PR, compilation, up-to-date, force-push and deletion protections are
+now configured; no additional GitHub settings change is required for those items.
+Repository publication remains a separate manual decision.
 
-```sh
-gh api --method PUT repos/JoeyBobbles/lifepo4-battery-monitor/vulnerability-alerts
-gh api --method PATCH repos/JoeyBobbles/lifepo4-battery-monitor --input - <<'JSON'
-{
-  "security_and_analysis": {
-    "secret_scanning": {"status": "enabled"},
-    "secret_scanning_push_protection": {"status": "enabled"}
-  }
-}
-JSON
-```
-
-Inspect the effective settings after applying the configuration:
+To inspect the current configuration without changing it:
 
 ```sh
-gh api repos/JoeyBobbles/lifepo4-battery-monitor/branches/main/protection
+gh api repos/JoeyBobbles/lifepo4-battery-monitor/rulesets/25589712
 gh api repos/JoeyBobbles/lifepo4-battery-monitor/rules/branches/main
 gh api repos/JoeyBobbles/lifepo4-battery-monitor --jq '.security_and_analysis'
 gh api -i repos/JoeyBobbles/lifepo4-battery-monitor/vulnerability-alerts
 ```
 
-Confirm the effective settings before publishing. Dependabot alerts do not replace
-manual Arduino library review. Check private-repository plan eligibility if GitHub
-rejects a configuration request.
-
-GitHub references: [branch protection](https://docs.github.com/en/rest/branches/branch-protection),
+GitHub references: [repository rulesets](https://docs.github.com/en/rest/repos/rules),
 [repository security settings](https://docs.github.com/en/rest/repos/repos).
