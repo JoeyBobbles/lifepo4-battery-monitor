@@ -50,6 +50,8 @@ Firmware lives in [`firmware/`](firmware/); open
 - [KiCad schematic](hardware/schematic_breadboard.kicad_sch)
 - [Rendered SVG diagram](docs/schematic_breadboard.svg)
 
+![Battery monitor schematic](docs/schematic_breadboard.svg)
+
 Use KiCad 9 or a compatible newer version. All five used symbols are embedded
 in the schematic; no custom symbol library is required. Standard KiCad libraries
 provide `Module:Arduino_Nano` and `Package_SO:VSSOP-10_3x3mm_P0.5mm` footprints.
