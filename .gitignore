@@ -87,6 +87,8 @@ Testing/
 *.kicad_pro-bak
 *.kicad_sch-bak
 *.kicad_pcb-bak
+*.kicad_sym-bak
+*.kicad_mod-bak
 *-backups/
 _autosave-*
 _saved_*
@@ -95,12 +97,18 @@ fp-info-cache
 \#auto_saved_files\#
 *.sch~
 *.pcb~
+*.bck
+*.sch-bak
+*.pro-bak
+*.pcb-bak
 
 # Editor configuration and temporary files
 .vscode/
 .idea/
 *.code-workspace
 *.swo
+.vs/
+.history/
 *~
 
 # Operating system files
@@ -108,6 +116,9 @@ fp-info-cache
 ._*
 Thumbs.db
 Desktop.ini
+ehthumbs.db
+.Spotlight-V100/
+.Trashes/
 $RECYCLE.BIN/
 
 # Local credentials and agent configuration
