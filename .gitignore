@@ -1,0 +1,119 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+*.so.*
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+# Keep *.lib: legacy KiCad symbol libraries use this extension.
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Build directories
+build/
+Build/
+build-*/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+*.swp
+
+# vcpkg
+vcpkg_installed/
+
+# debug information files
+*.dwo
+
+# test output & cache
+Testing/
+.cache/
+
+# Arduino CLI / IDE build output
+*.elf
+*.hex
+*.eep
+*.bin
+*.map
+*.lst
+*.lss
+*.su
+*.ino.cpp
+*.with_bootloader.*
+.arduino/
+.pio/
+
+# KiCad local state, recovery files and automatic backups
+# Keep .kicad_pro, .kicad_sch, .kicad_pcb, .kicad_sym and .pretty libraries.
+*.kicad_prl
+*.kicad_pro-bak
+*.kicad_sch-bak
+*.kicad_pcb-bak
+*-backups/
+_autosave-*
+_saved_*
+~*.lck
+fp-info-cache
+\#auto_saved_files\#
+*.sch~
+*.pcb~
+
+# Editor configuration and temporary files
+.vscode/
+.idea/
+*.code-workspace
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Local credentials and agent configuration
+.env
+.env.*
+!.env.example
+.aws/
+.codex/
+.agents/
