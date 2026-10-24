@@ -23,7 +23,7 @@ to either display or serial.
 | Component | Purpose / status |
 | --- | --- |
 | Arduino Nano, ATmega328P | Controller; I²C on A4/SDA and A5/SCL |
-| Adafruit INA228 breakout with shunt | Voltage/current sensing; firmware assumes 0.015 Ω and 10 A calibration range |
+| SparkFun INA228 current sensor (Qwiic) with shunt | Voltage/current sensing; firmware assumes 0.015 Ω and 10 A calibration range |
 | SH1106 128 × 64 I²C OLED | Display using U8g2 |
 | Momentary push button | D3 to ground, using the internal pull-up |
 | 5 V buck converter | Regulated Nano supply |
@@ -34,6 +34,34 @@ The 10 A calibration setting is not a verified safe continuous-current rating.
 Confirm the actual breakout, shunt rating, signal levels, supply current and
 common ground before wiring. See [hardware notes](docs/HARDWARE.md).
 The schematic is a breadboard prototype; the PCB file is an empty placeholder.
+
+## Bill of Materials (BoM)
+
+Parts used for this build are listed below. See the [detailed BoM](docs/BOM.md)
+for costs, pricing sources and the project total.
+
+### Base parts
+
+| Part | Quantity | Supplier |
+| --- | ---: | --- |
+| PCB protoboard | 2 | [The Pi Hut](https://thepihut.com/products/pcb-breadboard-protoboard?variant=56083548471681) |
+| Adafruit SPI FRAM module, 64 Kbit / 8 KByte | 1 | [The Pi Hut](https://thepihut.com/products/adafruit-spi-non-volatile-fram-breakout-64kbit-8kbyte?variant=27739672465) |
+| SparkFun current sensor — INA228 (Qwiic) | 1 | [The Pi Hut](https://thepihut.com/products/sparkfun-current-sensor-ina228-qwiic?variant=56219426652545) |
+| DC-DC buck converter, 7–24 V to 5 V / 4 A | 1 | [The Pi Hut](https://thepihut.com/products/dc-dc-buck-converter-7-24v-to-5v-4a?variant=39865627607235) |
+| 1.3-inch OLED display module, 128 × 64 | 1 | [The Pi Hut](https://thepihut.com/products/1-3-oled-display-module-128x64?variant=42810024755395) |
+| ELEGOO Arduino-compatible Nano V3.0 | 1 board | [ELEGOO EU (three-board pack)](https://eu.elegoo.com/en-es/products/elegoo-nano-v3-0) |
+
+### Extra parts
+
+| Part | Quantity | Supplier |
+| --- | ---: | --- |
+| 120-piece 2.54 mm breakaway PCB pin header connector strip assortment kit | 1 kit | [Amazon UK](https://www.amazon.co.uk/dp/B09NDMVD2C) |
+| 310-piece M3 male/female nylon hex standoff spacer kit | 1 kit | [Amazon UK](https://www.amazon.co.uk/dp/B09P8VB2G4) |
+
+Kit quantities refer to complete purchased assortments; only some pieces are used
+in the build. The linked Nano listing supplies three boards; one is used here.
+Batteries, the page button, wiring, solder and any enclosure are outside this
+supplied parts list.
 
 ## Files and schematics
 
