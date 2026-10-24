@@ -39,6 +39,6 @@ jobs:
         run: |
           arduino-cli core update-index
           arduino-cli core install arduino:avr@1.8.8
-          arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4" "Adafruit FRAM SPI@2.6.2"
       - name: Compile Nano firmware
         run: arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware

@@ -24,8 +24,9 @@ LiFePO4 pack
 All connected circuits need a common ground. Verify the Nano's available 3.3 V
 current, module supply requirements, I²C pull-up voltages and signal compatibility.
 This supply diagram is a prototype note, not a validated wiring specification.
-The schematic includes an SPI FRAM header; firmware persistence and final module
-power/signal wiring documentation are still planned.
+The schematic includes an SPI FRAM header. Firmware now supports the Adafruit
+64 Kbit SPI FRAM; see the [FRAM wiring table](../README.md#fram-wiring-and-persistence)
+for D10–D13, 5 V, WP and HOLD connections. Physical wiring still needs bench validation.
 
 ## Schematics
 
@@ -40,9 +41,10 @@ The [SVG export](schematic_breadboard.svg) is retained for review.
 
 Current is integrated using successive samples and elapsed time. Positive current
 adds to amp-hours used; negative current subtracts. Used capacity is clamped to
-0–16 Ah. Remaining capacity is 16 Ah minus used capacity. Every boot starts at
-an assumed 100%, with no saved history or reset control. Runtime estimates are
-not currently output. Accuracy depends on calibration, starting charge,
+0–16 Ah. Remaining capacity is 16 Ah minus used capacity. Valid FRAM records
+restore used capacity after reboot; without valid saved state, capacity starts
+at an assumed 100%. There is no reset control. Runtime estimates are not
+currently output. Accuracy depends on calibration, starting charge,
 uninterrupted current observation, temperature, battery age and load.
 
 ## Safety and licence

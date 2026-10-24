@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <Adafruit_INA228.h>
+#include "Persistence.h"
 
 // =====================================================
 // Configuration
@@ -59,6 +60,10 @@ bool sensorAvailable = false;
 
 // Battery tracking
 float usedAh = 0.0f;
+float usedWh = 0.0f;
+uint32_t operatingSeconds = 0;
+unsigned long lastOperatingUpdate = 0;
+uint16_t operatingRemainderMs = 0;
 float remainingAh = BATTERY_CAPACITY_AH;
 float batteryPercent = 100.0f;
 
@@ -68,6 +73,7 @@ bool averageInitialised = false;
 
 // Previous current for integration
 float previousCurrent = 0.0f;
+float previousSignedPower = 0.0f;
 bool previousCurrentValid = false;
 
 // =====================================================
@@ -93,19 +99,22 @@ void setup() {
     Serial.println(F("ERROR: INA228 not detected"));
   }
 
-  // Start at 100% capacity
-  usedAh = 0.0f;
-  remainingAh = BATTERY_CAPACITY_AH;
-  batteryPercent = 100.0f;
+  persistence::begin(usedAh, usedWh, operatingSeconds);
+  remainingAh = BATTERY_CAPACITY_AH - usedAh;
+  batteryPercent = (remainingAh / BATTERY_CAPACITY_AH) * 100.0f;
+  previousCurrentValid = false;
 
   startTime = millis();
   lastUpdate = startTime;
   lastMeasurement = startTime;
+  lastOperatingUpdate = startTime;
+  operatingRemainderMs = 0;
 
   drawDisplay();
 
   Serial.println(F("Battery monitor started"));
-  Serial.println(F("Initial capacity: 16.00 Ah"));
+  Serial.print(F("Initial remaining Ah: "));
+  Serial.println(remainingAh);
 }
 
 // =====================================================
@@ -181,8 +190,12 @@ void updateMeasurements(unsigned long now) {
         (previousCurrent + current) / 2.0f;
 
     usedAh += averageIntervalCurrent * elapsedHours;
+    // INA228 power is unsigned; voltage * signed current preserves charging.
+    usedWh = max(0.0f, usedWh +
+        (previousSignedPower + voltage * current) * 0.5f * elapsedHours);
   }
 
+  previousSignedPower = voltage * current;
   previousCurrent = current;
   previousCurrentValid = true;
 
@@ -367,6 +380,14 @@ void loop() {
   handleButton();
 
   unsigned long now = millis();
+  unsigned long elapsed = now - lastOperatingUpdate;
+  lastOperatingUpdate = now;
+  uint32_t seconds = elapsed / 1000;
+  uint16_t remainder = operatingRemainderMs + elapsed % 1000;
+  seconds += remainder / 1000;
+  operatingRemainderMs = remainder % 1000;
+  // Saturate after about 136 years rather than wrapping the lifetime counter.
+  operatingSeconds += min(seconds, UINT32_MAX - operatingSeconds);
 
   if (now - lastUpdate >= UPDATE_INTERVAL) {
     lastUpdate = now;
@@ -374,4 +395,5 @@ void loop() {
     updateMeasurements(now);
     drawDisplay();
   }
+  persistence::update(now, usedAh, usedWh, operatingSeconds);
 }

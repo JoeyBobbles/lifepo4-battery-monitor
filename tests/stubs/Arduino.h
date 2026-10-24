@@ -29,6 +29,7 @@ template <typename T> T constrain(T value, T low, T high) {
   return std::min(std::max(value, low), high);
 }
 using std::max;
+using std::min;
 
 struct FakeSerial {
   unsigned long baud = 0;
