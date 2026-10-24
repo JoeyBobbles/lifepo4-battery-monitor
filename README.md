@@ -85,6 +85,19 @@ In Arduino IDE, install **Arduino AVR Boards**, select **Arduino Nano** and
 sketch, select the serial port, verify, then upload. `Arduino.h`, Wire and SPI
 come with the AVR core; BusIO is required by INA228. No FRAM library is needed.
 
+## Firmware tests
+
+Logic tests run on a computer with Bash and a C++17 compiler, without a Nano:
+
+```sh
+bash tests/run.sh
+```
+
+They exercise the existing sketch using simulated sensor, button and clock inputs.
+Tests live outside `firmware/` and do not change Arduino IDE uploads or add any
+dependencies to the Nano. CI runs these tests alongside the Nano compilation check.
+See [test instructions and coverage limits](tests/README.md).
+
 ## Limitations and planned work
 
 The monitor cannot protect or disconnect the battery. Capacity is clamped to
