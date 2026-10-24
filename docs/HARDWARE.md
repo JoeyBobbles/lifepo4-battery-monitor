@@ -43,7 +43,8 @@ Current is integrated using successive samples and elapsed time. Positive curren
 adds to amp-hours used; negative current subtracts. Used capacity is clamped to
 0–16 Ah. Remaining capacity is 16 Ah minus used capacity. Valid FRAM records
 restore used capacity after reboot; without valid saved state, capacity starts
-at an assumed 100%. There is no reset control. Runtime estimates are not
+at an assumed 100%. A ten-second D3 hold resets counters to assumed full capacity;
+see the [reset instructions](../README.md#reset-metrics). Runtime estimates are not
 currently output. Accuracy depends on calibration, starting charge,
 uninterrupted current observation, temperature, battery age and load.
 

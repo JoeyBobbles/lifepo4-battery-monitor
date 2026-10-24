@@ -35,6 +35,9 @@ rollover are also checked. The fake FRAM retains bytes across simulated restarts
 it models partial writes and API failures, not electrical SPI behavior.
 Debug-page tests cover the bool-controlled page cycle, missing INA228/FRAM,
 cached device IDs, restore/save/error states, and rendering without storage I/O.
+Reset tests cover the ten-second threshold, cancellation during release debounce,
+flashing text, confirmation duration, one reset per hold, restart durability,
+failed-save retry, unavailable FRAM and unsigned clock rollover.
 See [validation results and manual checks](../docs/FRAM_VALIDATION.md).
 
 ## Arduino IDE deployment

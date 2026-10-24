@@ -32,6 +32,8 @@ constexpr float MAX_CURRENT = 10.0f;
 // Timing
 constexpr unsigned long UPDATE_INTERVAL = 500;
 constexpr unsigned long DEBOUNCE_MS = 50;
+constexpr unsigned long RESET_HOLD_MS = 10000;
+constexpr unsigned long RESET_NOTICE_MS = 3000;
 
 // Ignore very small current readings caused by noise
 constexpr float CURRENT_NOISE_THRESHOLD = 0.005f;
@@ -53,6 +55,11 @@ unsigned long lastMeasurement = 0;
 bool lastButtonReading = HIGH;
 bool stableButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
+unsigned long buttonPressedAt = 0;
+unsigned long resetNoticeStarted = 0;
+bool resetHandled = false;
+bool resetNotice = false;
+bool resetSavePending = false;
 
 // INA228 measurements
 float voltage = 0.0f;
@@ -124,8 +131,25 @@ void setup() {
 // Button handling
 // =====================================================
 
+void resetMetrics(unsigned long now) {
+  usedAh = usedWh = 0;
+  remainingAh = BATTERY_CAPACITY_AH;
+  batteryPercent = 100;
+  operatingSeconds = operatingRemainderMs = 0;
+  startTime = lastOperatingUpdate = lastMeasurement = lastUpdate = now;
+  previousCurrentValid = averageInitialised = false;
+  previousCurrent = previousSignedPower = averageCurrent = 0;
+  // Persist immediately; a failure remains pending for the normal timed retry.
+  resetSavePending = !persistence::save(usedAh, usedWh, operatingSeconds);
+  persistence::lastSaveAttempt = millis();
+  resetNotice = true;
+  resetNoticeStarted = now;
+  Serial.println(F("Battery metrics reset; assuming full battery"));
+}
+
 void handleButton() {
   bool reading = digitalRead(BUTTON_PIN);
+  unsigned long now = millis();
 
   if (reading != lastButtonReading) {
     lastDebounceTime = millis();
@@ -135,16 +159,36 @@ void handleButton() {
     if (reading != stableButtonState) {
       stableButtonState = reading;
 
-      // One page change per press
+      // One page change per press; holding for ten seconds also resets metrics.
       if (stableButtonState == LOW) {
+        buttonPressedAt = now;
+        resetHandled = false;
+        resetNotice = false;
         currentPage = (currentPage + 1) % (enableFramDebugPage ? 3 : 2);
 
         Serial.print(F("Page: "));
         Serial.println(currentPage + 1);
 
         drawDisplay();
+      } else {
+        // Keep confirmation visible for three seconds after release.
+        resetNoticeStarted = now;
+        drawDisplay();
       }
     }
+  }
+
+  // A raw release cancels eligibility immediately, before release debounce.
+  if (stableButtonState == LOW && reading == LOW && !resetHandled &&
+      now - buttonPressedAt >= RESET_HOLD_MS) {
+    resetHandled = true;
+    resetMetrics(now);
+    drawDisplay();
+  }
+  if (resetNotice && stableButtonState == HIGH &&
+      now - resetNoticeStarted >= RESET_NOTICE_MS) {
+    resetNotice = false;
+    drawDisplay();
   }
 
   lastButtonReading = reading;
@@ -359,6 +403,30 @@ void drawCapacityPage() {
 // Display
 // =====================================================
 
+void drawResetPage() {
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 16);
+  unsigned long held = millis() - buttonPressedAt;
+  if (resetNotice) {
+    u8g2.print(F("METRICS RESET"));
+    u8g2.setCursor(0, 32);
+    if (!persistence::available) u8g2.print(F("FRAM unavailable"));
+    else if (resetSavePending) u8g2.print(F("FRAM save pending"));
+    else u8g2.print(F("FRAM saved"));
+  } else {
+    // Blink the heading on each 500 ms refresh while the hold counts down.
+    if ((held / 500) % 2 == 0) u8g2.print(F("HOLD TO RESET"));
+    u8g2.setCursor(0, 32);
+    u8g2.print(F("Reset in: "));
+    u8g2.print(held >= RESET_HOLD_MS ? 0UL : (RESET_HOLD_MS - held + 999) / 1000);
+    u8g2.print(F(" s"));
+    u8g2.setCursor(0, 47);
+    u8g2.print(F("Release to cancel"));
+  }
+  u8g2.setCursor(0, 62);
+  u8g2.print(F("Assumes full battery"));
+}
+
 void drawFramDebugPage() {
   u8g2.setFont(u8g2_font_6x10_tr);
   u8g2.setCursor(0, 9);
@@ -405,7 +473,10 @@ void drawDisplay() {
   u8g2.firstPage();
 
   do {
-    if (enableFramDebugPage && currentPage == 2) {
+    if (resetNotice || (stableButtonState == LOW && !resetHandled &&
+                        millis() - buttonPressedAt >= 1000)) {
+      drawResetPage();
+    } else if (enableFramDebugPage && currentPage == 2) {
       drawFramDebugPage();
     } else if (!sensorAvailable) {
       u8g2.setFont(u8g2_font_6x10_tr);
@@ -443,4 +514,7 @@ void loop() {
     drawDisplay();
   }
   persistence::update(now, usedAh, usedWh, operatingSeconds);
+  if (resetSavePending && persistence::status == persistence::Status::Saved) {
+    resetSavePending = false;
+  }
 }

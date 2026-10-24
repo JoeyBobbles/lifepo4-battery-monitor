@@ -7,8 +7,9 @@ Validated on a host on 2026-10-24. No physical Nano/FRAM assembly was available.
 `firmware/Persistence.h` owns FRAM startup, validation, restore and periodic saves;
 `firmware/firmware.ino` supplies its existing consumed Ah counter and new consumed
 Wh/operating seconds. Display pages, INA228 settings, capacity calculation and
-D3 debounce/page switching retain their existing behavior. No reset function or
-new control exists, so reset-followed-by-restart acceptance is not applicable.
+D3 debounce and short-press page switching retain their existing behavior. A
+subsequent requested extension adds a ten-second D3 reset with a flashing countdown
+and save confirmation; the optional FRAM debug page is enabled by default.
 
 Two 28-byte version-1 records occupy FRAM addresses 0–55. Each contains magic,
 version, reserved zero bytes, uint32 sequence, float Ah/Wh, uint32 operating seconds
@@ -25,7 +26,7 @@ persistence instead of treating unreadable storage as empty.
 
 ## Automated results
 
-`bash tests/run.sh`: **25 cases passed**, including the original 14 cases.
+`bash tests/run.sh`: **29 cases passed**, including the original 14 cases.
 The harness includes the real sketch and storage logic with simulated hardware.
 
 | Acceptance scenario | Simulated result |
@@ -43,7 +44,7 @@ The harness includes the real sketch and storage logic with simulated hardware.
 | Timer and sequence wrap | Save/operating timers and uint32 sequence rollover pass |
 | Wh and operating time | Signed charge/discharge Wh, zero clamp, fractional time, missing sensor and saturation pass |
 | Optional FRAM debug page | Three-page cycle when enabled, hidden when disabled; reachable without INA228; cached ID/status, failures and recovery shown without FRAM I/O during drawing |
-| Reset then restart | Not applicable: no reset control exists |
+| Reset then restart | Ten-second hold zeroes Ah/Wh/time, resets percentage and integration baseline, and survives restart after verified save; save failure retries, unavailable FRAM is indicated, cancellation and timer rollover pass |
 
 The host uses its native `unsigned long`, potentially 64 bits; rollover tests
 exercise unsigned subtraction, not an emulated AVR ABI. CRC and record-size checks
@@ -62,9 +63,9 @@ arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 | Build | Flash (30,720 bytes available) | Static SRAM (2,048 bytes available) |
 | --- | --- | --- |
 | `origin/main` baseline, `6b3ad58` | 24,146 bytes (78%) | 1,023 bytes (49%) |
-| Issue #4 with debug page enabled | 28,664 bytes (93%) | 1,191 bytes (58%) |
+| Issue #4 with debug page and hold reset | 29,724 bytes (96%) | 1,202 bytes (58%) |
 
-Both builds pass. The implementation leaves **857 bytes for stack and heap**.
+Both builds pass. The implementation leaves **846 bytes for stack and heap**.
 There are no application allocations or `String` objects. The Adafruit libraries
 allocate their device objects internally; static SRAM reports exclude these
 allocations and the call stack. Storage logic uses small fixed-size records;
@@ -79,6 +80,8 @@ actual remaining SRAM under load still needs measurement on the Nano.
   or a diagnostic FRAM read, and check OLED refresh and D3 responsiveness.
 - Test startup without FRAM, runtime disconnection/reconnection and write protection;
   confirm diagnostics, continued monitoring and save retry behavior.
+- Check the hold countdown/blinking, cancellation near ten seconds, one reset per
+  hold, confirmation wording with working/failed FRAM, and reset followed by reboot.
 - Measure current polarity/calibration, Wh accuracy, SPI behavior during brownouts,
   and actual stack/heap margin over extended operation.
 

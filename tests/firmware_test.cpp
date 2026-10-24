@@ -34,6 +34,8 @@ void reset() {
   usedWh = previousSignedPower = 0;
   operatingSeconds = operatingRemainderMs = lastOperatingUpdate = 0;
   enableFramDebugPage = false;
+  buttonPressedAt = resetNoticeStarted = 0;
+  resetHandled = resetNotice = resetSavePending = false;
   currentPage = 0;
   startTime = lastUpdate = lastMeasurement = lastDebounceTime = 0;
   lastButtonReading = stableButtonState = HIGH;
@@ -515,9 +517,121 @@ void framDebugFailures() {
           u8g2.text.find("not this boot") != std::string::npos, "restore is not a verified write this boot");
 }
 
+void longPressReset() {
+  setup();
+  usedAh = 5;
+  usedWh = 64;
+  operatingSeconds = 50;
+  require(persistence::save(usedAh, usedWh, operatingSeconds), "seed counters before reset");
+  button(100, LOW);
+  button(151, LOW);
+  button(10150, LOW);
+  near(usedAh, 5);
+  previousCurrentValid = averageInitialised = true;
+  previousCurrent = averageCurrent = 2;
+  previousSignedPower = 25.6f;
+  button(10151, LOW);
+  near(usedAh, 0);
+  near(usedWh, 0);
+  near(remainingAh, 16);
+  near(batteryPercent, 100);
+  require(operatingSeconds == 0 && operatingRemainderMs == 0, "operating time reset");
+  require(!previousCurrentValid && !averageInitialised, "integration/smoothing reseeded");
+  require(resetNotice && !resetSavePending && resetHandled, "reset acknowledged and saved");
+  require(u8g2.text.find("METRICS RESET") != std::string::npos &&
+          u8g2.text.find("FRAM saved") != std::string::npos, "reset confirmation");
+  auto sequence = persistence::saved.sequence;
+  button(25000, LOW);
+  require(persistence::saved.sequence == sequence, "held button resets once");
+  button(25100, HIGH);
+  button(25151, HIGH);
+  button(28150, HIGH);
+  require(resetNotice, "confirmation remains three seconds after release");
+  button(28151, HIGH);
+  require(!resetNotice, "confirmation expires");
+  restart();
+  near(usedAh, 0);
+  near(usedWh, 0);
+  require(operatingSeconds == 0, "reset survives restart");
+}
+
+void resetCountdownAndCancel() {
+  setup();
+  usedAh = 5;
+  button(100, LOW);
+  button(151, LOW);
+  for (unsigned long time = 500; time <= 2000; time += 500) {
+    fake::now = time;
+    loop();
+  }
+  require(ina228.reads == 4 && persistence::saved.operatingSeconds == 2,
+          "measurement and saves continue while holding");
+  button(2151, LOW);
+  drawDisplay();
+  require(u8g2.text.find("HOLD TO RESET") != std::string::npos &&
+          u8g2.text.find("Release to cancel") != std::string::npos, "hold guidance");
+  button(2651, LOW);
+  drawDisplay();
+  require(u8g2.text.find("HOLD TO RESET") == std::string::npos, "heading blinks");
+  // Release just before threshold, but debounce completes after it.
+  button(10150, HIGH);
+  button(10151, HIGH);
+  require(!resetHandled, "raw release cancels threshold reset");
+  button(10201, HIGH);
+  near(usedAh, 5);
+  drawDisplay();
+  require(u8g2.text.find("Release to cancel") == std::string::npos, "release exits countdown");
+  button(10300, LOW);
+  button(10351, LOW);
+  button(20351, LOW);
+  near(usedAh, 0);
+}
+
+void resetSaveFailure() {
+  setup();
+  usedAh = 5;
+  require(persistence::save(5, 64, 50), "seed saved counters");
+  persistence::fram.writeFailure = true;
+  button(100, LOW);
+  button(151, LOW);
+  button(10151, LOW);
+  require(resetSavePending && u8g2.text.find("FRAM save pending") != std::string::npos,
+          "failed save not claimed durable");
+  near(usedAh, 0);
+  persistence::fram.writeFailure = false;
+  fake::now = 11151;
+  loop();
+  require(!resetSavePending, "reset save retried by loop");
+  restart();
+  near(usedAh, 0);
+  near(usedWh, 0);
+  require(operatingSeconds == 1, "only time since reset persisted");
+  reset();
+  persistence::fram.present = false;
+  setup();
+  button(100, LOW);
+  button(151, LOW);
+  button(10151, LOW);
+  require(u8g2.text.find("FRAM unavailable") != std::string::npos, "volatile reset indicated");
+}
+
+void resetClockWrap() {
+  setup();
+  unsigned long maximum = std::numeric_limits<unsigned long>::max();
+  button(maximum - 9999, LOW);
+  button(maximum - 9948, LOW);
+  usedAh = 4;
+  button(50, LOW); // 9999 ms after debounced press.
+  near(usedAh, 4);
+  button(51, LOW);
+  near(usedAh, 0);
+}
+
 int main() {
   struct Test { const char* name; void (*run)(); };
   const Test tests[] = {
+    {"long press reset", longPressReset}, {"reset countdown and cancel", resetCountdownAndCancel},
+    {"reset save failure", resetSaveFailure}, {"reset clock wrap", resetClockWrap},
     {"FRAM debug page", framDebugPage}, {"FRAM debug failures", framDebugFailures},
     {"blank FRAM", blankFram}, {"periodic persistence and restart", periodicPersistence},
     {"slot corruption", slotCorruption}, {"record validation", recordValidation},

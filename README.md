@@ -131,10 +131,24 @@ no powered-off interval is counted. Consumption while the monitor is off cannot
 be measured. SPI readback detects many failures but is not a hardware write
 acknowledgement or a guarantee against brownouts, bus faults or CRC collisions.
 
-There is no battery counter reset control; D3 still only changes pages. No new
-reset gesture is introduced. The OLED continues to show session uptime and the
-existing pages; Wh and accumulated operating seconds are stored without adding
-new consumption display pages.
+### Reset metrics
+
+Hold D3 for **10 seconds** to reset consumed Ah, consumed Wh, accumulated operating
+time and session uptime. Capacity returns to **16 Ah / 100% assumed full**; only
+use this when you intend to mark the battery full. A short press still changes
+pages immediately. After one second of holding, the OLED shows a countdown,
+flashing `HOLD TO RESET` and `Release to cancel`. Releasing before ten seconds
+cancels the reset. Monitoring and periodic saves continue during the countdown.
+
+At ten seconds the display shows `METRICS RESET` and the FRAM result. Reset values
+are saved immediately with readback verification. `FRAM saved` confirms success;
+`FRAM save pending` means the reset happened in RAM and the normal save timer will
+retry. With no FRAM it shows `FRAM unavailable`; a reset cannot then be guaranteed
+to survive restart. Losing power before a successful save can restore old counters.
+Confirmation remains while held and for three seconds after release. Holding
+longer does not reset repeatedly. Consumption and operating time resume from zero;
+the first post-reset sample seeds integration. Live voltage/current/power remain
+available and the existing pages retain their layout.
 
 ### FRAM debug page
 
@@ -178,7 +192,7 @@ and current direction/calibration are correct. Voltage readings alone do not
 establish LiFePO4 state of charge. Measurements and hardware ratings still need
 bench validation; compilation is not an electrical safety check.
 
-Planned: a capacity reset control, a displayed runtime estimate,
+Planned: a displayed runtime estimate,
 and verified final wiring, calibration and enclosure documentation. The KiCad
 breadboard schematic and SVG already exist; they are not a production PCB design.
 
