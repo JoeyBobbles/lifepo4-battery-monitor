@@ -9,6 +9,7 @@
 constexpr bool HIGH = true;
 constexpr bool LOW = false;
 constexpr int INPUT_PULLUP = 2;
+constexpr int HEX = 16;
 #define F(text) text
 
 namespace fake {
@@ -29,6 +30,7 @@ template <typename T> T constrain(T value, T low, T high) {
   return std::min(std::max(value, low), high);
 }
 using std::max;
+using std::min;
 
 struct FakeSerial {
   unsigned long baud = 0;

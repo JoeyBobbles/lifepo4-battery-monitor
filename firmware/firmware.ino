@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <Adafruit_INA228.h>
+#include "Persistence.h"
 
 // =====================================================
 // Configuration
@@ -18,6 +19,9 @@ Adafruit_INA228 ina228;
 // Hardware
 constexpr uint8_t BUTTON_PIN = 3;
 
+// Include a third OLED page for FRAM troubleshooting. Set false to hide it.
+bool enableFramDebugPage = true;
+
 // Battery bank: 2 x 12.8V 8Ah LiFePO4 in parallel
 constexpr float BATTERY_CAPACITY_AH = 16.0f;
 
@@ -28,6 +32,8 @@ constexpr float MAX_CURRENT = 10.0f;
 // Timing
 constexpr unsigned long UPDATE_INTERVAL = 500;
 constexpr unsigned long DEBOUNCE_MS = 50;
+constexpr unsigned long RESET_HOLD_MS = 10000;
+constexpr unsigned long RESET_NOTICE_MS = 3000;
 
 // Ignore very small current readings caused by noise
 constexpr float CURRENT_NOISE_THRESHOLD = 0.005f;
@@ -49,6 +55,11 @@ unsigned long lastMeasurement = 0;
 bool lastButtonReading = HIGH;
 bool stableButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
+unsigned long buttonPressedAt = 0;
+unsigned long resetNoticeStarted = 0;
+bool resetHandled = false;
+bool resetNotice = false;
+bool resetSavePending = false;
 
 // INA228 measurements
 float voltage = 0.0f;
@@ -59,6 +70,10 @@ bool sensorAvailable = false;
 
 // Battery tracking
 float usedAh = 0.0f;
+float usedWh = 0.0f;
+uint32_t operatingSeconds = 0;
+unsigned long lastOperatingUpdate = 0;
+uint16_t operatingRemainderMs = 0;
 float remainingAh = BATTERY_CAPACITY_AH;
 float batteryPercent = 100.0f;
 
@@ -68,6 +83,7 @@ bool averageInitialised = false;
 
 // Previous current for integration
 float previousCurrent = 0.0f;
+float previousSignedPower = 0.0f;
 bool previousCurrentValid = false;
 
 // =====================================================
@@ -93,27 +109,47 @@ void setup() {
     Serial.println(F("ERROR: INA228 not detected"));
   }
 
-  // Start at 100% capacity
-  usedAh = 0.0f;
-  remainingAh = BATTERY_CAPACITY_AH;
-  batteryPercent = 100.0f;
+  persistence::begin(usedAh, usedWh, operatingSeconds);
+  remainingAh = BATTERY_CAPACITY_AH - usedAh;
+  batteryPercent = (remainingAh / BATTERY_CAPACITY_AH) * 100.0f;
+  previousCurrentValid = false;
 
   startTime = millis();
   lastUpdate = startTime;
   lastMeasurement = startTime;
+  lastOperatingUpdate = startTime;
+  operatingRemainderMs = 0;
 
   drawDisplay();
 
   Serial.println(F("Battery monitor started"));
-  Serial.println(F("Initial capacity: 16.00 Ah"));
+  Serial.print(F("Initial remaining Ah: "));
+  Serial.println(remainingAh);
 }
 
 // =====================================================
 // Button handling
 // =====================================================
 
+void resetMetrics(unsigned long now) {
+  usedAh = usedWh = 0;
+  remainingAh = BATTERY_CAPACITY_AH;
+  batteryPercent = 100;
+  operatingSeconds = operatingRemainderMs = 0;
+  startTime = lastOperatingUpdate = lastMeasurement = lastUpdate = now;
+  previousCurrentValid = averageInitialised = false;
+  previousCurrent = previousSignedPower = averageCurrent = 0;
+  // Persist immediately; a failure remains pending for the normal timed retry.
+  resetSavePending = !persistence::save(usedAh, usedWh, operatingSeconds);
+  persistence::lastSaveAttempt = millis();
+  resetNotice = true;
+  resetNoticeStarted = now;
+  Serial.println(F("Battery metrics reset; assuming full battery"));
+}
+
 void handleButton() {
   bool reading = digitalRead(BUTTON_PIN);
+  unsigned long now = millis();
 
   if (reading != lastButtonReading) {
     lastDebounceTime = millis();
@@ -123,16 +159,36 @@ void handleButton() {
     if (reading != stableButtonState) {
       stableButtonState = reading;
 
-      // One page change per press
+      // One page change per press; holding for ten seconds also resets metrics.
       if (stableButtonState == LOW) {
-        currentPage = (currentPage + 1) % 2;
+        buttonPressedAt = now;
+        resetHandled = false;
+        resetNotice = false;
+        currentPage = (currentPage + 1) % (enableFramDebugPage ? 3 : 2);
 
         Serial.print(F("Page: "));
         Serial.println(currentPage + 1);
 
         drawDisplay();
+      } else {
+        // Keep confirmation visible for three seconds after release.
+        resetNoticeStarted = now;
+        drawDisplay();
       }
     }
+  }
+
+  // A raw release cancels eligibility immediately, before release debounce.
+  if (stableButtonState == LOW && reading == LOW && !resetHandled &&
+      now - buttonPressedAt >= RESET_HOLD_MS) {
+    resetHandled = true;
+    resetMetrics(now);
+    drawDisplay();
+  }
+  if (resetNotice && stableButtonState == HIGH &&
+      now - resetNoticeStarted >= RESET_NOTICE_MS) {
+    resetNotice = false;
+    drawDisplay();
   }
 
   lastButtonReading = reading;
@@ -181,8 +237,12 @@ void updateMeasurements(unsigned long now) {
         (previousCurrent + current) / 2.0f;
 
     usedAh += averageIntervalCurrent * elapsedHours;
+    // INA228 power is unsigned; voltage * signed current preserves charging.
+    usedWh = max(0.0f, usedWh +
+        (previousSignedPower + voltage * current) * 0.5f * elapsedHours);
   }
 
+  previousSignedPower = voltage * current;
   previousCurrent = current;
   previousCurrentValid = true;
 
@@ -343,17 +403,88 @@ void drawCapacityPage() {
 // Display
 // =====================================================
 
+void drawResetPage() {
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 16);
+  unsigned long held = millis() - buttonPressedAt;
+  if (resetNotice) {
+    u8g2.print(F("METRICS RESET"));
+    u8g2.setCursor(0, 32);
+    if (!persistence::available) u8g2.print(F("FRAM unavailable"));
+    else if (resetSavePending) u8g2.print(F("FRAM save pending"));
+    else u8g2.print(F("FRAM saved"));
+  } else {
+    // Blink the heading on each 500 ms refresh while the hold counts down.
+    if ((held / 500) % 2 == 0) u8g2.print(F("HOLD TO RESET"));
+    u8g2.setCursor(0, 32);
+    u8g2.print(F("Reset in: "));
+    u8g2.print(held >= RESET_HOLD_MS ? 0UL : (RESET_HOLD_MS - held + 999) / 1000);
+    u8g2.print(F(" s"));
+    u8g2.setCursor(0, 47);
+    u8g2.print(F("Release to cancel"));
+  }
+  u8g2.setCursor(0, 62);
+  u8g2.print(F("Assumes full battery"));
+}
+
+void drawFramDebugPage() {
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 9);
+  u8g2.print(F("FRAM DEBUG"));
+  u8g2.setCursor(0, 20);
+  switch (persistence::status) {
+    case persistence::Status::NotStarted: u8g2.print(F("Not started")); break;
+    case persistence::Status::InitFailed: u8g2.print(F("INIT FAILED")); break;
+    case persistence::Status::ReadFailed: u8g2.print(F("READ FAILED")); break;
+    case persistence::Status::Restored: u8g2.print(F("Restored / ready")); break;
+    case persistence::Status::Saved: u8g2.print(F("Save verified")); break;
+    case persistence::Status::SaveFailed: u8g2.print(F("SAVE FAILED / retry")); break;
+    case persistence::Status::InvalidCounters: u8g2.print(F("Invalid counters")); break;
+  }
+  u8g2.setCursor(0, 31);
+  u8g2.print(F("ID: "));
+  if (persistence::deviceIDRead) {
+    u8g2.print(persistence::manufacturerID, HEX);
+    u8g2.print(F(" / "));
+    u8g2.print(persistence::productID, HEX);
+  } else {
+    u8g2.print(F("read failed"));
+  }
+  u8g2.setCursor(0, 42);
+  u8g2.print(F("Slot: "));
+  bool hasRecord = persistence::saved.magic == persistence::MAGIC;
+  if (hasRecord) u8g2.print(persistence::activeSlot);
+  else u8g2.print(F("none"));
+  u8g2.setCursor(0, 53);
+  u8g2.print(F("Seq: "));
+  if (hasRecord) u8g2.print(persistence::saved.sequence);
+  else u8g2.print(F("none"));
+  u8g2.setCursor(0, 63);
+  u8g2.print(F("Saved: "));
+  if (persistence::hasWritten) {
+    u8g2.print((millis() - persistence::lastSuccessfulSave) / 1000);
+    u8g2.print(F("s ago"));
+  } else {
+    u8g2.print(F("not this boot"));
+  }
+}
+
 void drawDisplay() {
   u8g2.firstPage();
 
   do {
-    if (!sensorAvailable) {
+    if (resetNotice || (stableButtonState == LOW && !resetHandled &&
+                        millis() - buttonPressedAt >= 1000)) {
+      drawResetPage();
+    } else if (enableFramDebugPage && currentPage == 2) {
+      drawFramDebugPage();
+    } else if (!sensorAvailable) {
       u8g2.setFont(u8g2_font_6x10_tr);
       u8g2.drawStr(0, 20, "INA228 NOT FOUND");
-    } else if (currentPage == 0) {
-      drawLivePage();
-    } else {
+    } else if (currentPage == 1) {
       drawCapacityPage();
+    } else {
+      drawLivePage();
     }
 
   } while (u8g2.nextPage());
@@ -367,11 +498,23 @@ void loop() {
   handleButton();
 
   unsigned long now = millis();
+  unsigned long elapsed = now - lastOperatingUpdate;
+  lastOperatingUpdate = now;
+  uint32_t seconds = elapsed / 1000;
+  uint16_t remainder = operatingRemainderMs + elapsed % 1000;
+  seconds += remainder / 1000;
+  operatingRemainderMs = remainder % 1000;
+  // Saturate after about 136 years rather than wrapping the lifetime counter.
+  operatingSeconds += min(seconds, UINT32_MAX - operatingSeconds);
 
   if (now - lastUpdate >= UPDATE_INTERVAL) {
     lastUpdate = now;
 
     updateMeasurements(now);
     drawDisplay();
+  }
+  persistence::update(now, usedAh, usedWh, operatingSeconds);
+  if (resetSavePending && persistence::status == persistence::Status::Saved) {
+    resetSavePending = false;
   }
 }

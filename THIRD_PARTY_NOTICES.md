@@ -9,6 +9,7 @@ No existing third-party copyright or licence notice was removed.
 | --- | --- |
 | [U8g2](https://github.com/olikraus/u8g2/blob/master/LICENSE), 2.36.19 | Code: BSD-2-Clause, Oliver Kraus; fonts have separate terms |
 | [Adafruit INA228](https://github.com/adafruit/Adafruit_INA228/blob/master/license.txt), 3.0.0 | BSD-3-Clause, copyright 2022 Adafruit Industries |
+| [Adafruit FRAM SPI](https://github.com/adafruit/Adafruit_FRAM_SPI/blob/master/LICENSE), 2.6.2 | BSD-3-Clause, Adafruit Industries |
 | [Adafruit BusIO](https://github.com/adafruit/Adafruit_BusIO/blob/master/LICENSE), 1.17.4 | MIT, copyright 2017 Adafruit Industries |
 | [Arduino AVR core](https://github.com/arduino/ArduinoCore-avr/blob/master/cores/arduino/Arduino.h), 1.8.8, including Wire/SPI | Core and bundled library files carry their own notices, including LGPL-2.1-or-later; retain the notices for the files used |
 | [KiCad standard symbol/footprint libraries](https://www.kicad.org/libraries/license/) | KiCad library contributors; CC-BY-SA-4.0 with the electronic-design exception |

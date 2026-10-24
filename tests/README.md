@@ -12,8 +12,8 @@ another compiler. The script builds in a temporary directory and cleans up
 afterwards. No Arduino libraries or board connection are required for these tests.
 
 The test program includes the actual `firmware/firmware.ino` and supplies small
-test substitutes for Arduino, INA228 and U8g2 APIs. Sensor readings, button levels
-and time are controlled by the tests. Calculations are performed by the sketch,
+test substitutes for Arduino, INA228, SPI FRAM and U8g2 APIs. Sensor readings,
+button levels and time are controlled by the tests. Calculations are performed by the sketch,
 not copied into a separate test implementation. Each case starts with reset
 sketch and fake-device state.
 
@@ -22,6 +22,23 @@ first-sample behavior, discharge/charge integration, irregular intervals, capaci
 limits, noise boundaries, smoothing, repeated 500 ms updates, debounce, scheduling,
 unsigned timestamp wrap and bounded time formatting. Float comparisons allow
 rounding error.
+
+Persistence cases exercise arbitrary initial memory, both slot validation paths,
+CRC coverage of every record byte, unsupported versions and invalid float counters,
+periodic saves, unchanged-state write suppression, restart continuity, one/both
+slots corrupted, and interrupted writes at every byte boundary while reusing an
+older valid slot. Failure injection covers unavailable FRAM, startup read errors,
+write-enable/write/readback failures, silent dropped writes, lost payloads, failed
+final readback, initial-save retry, and successful retry.
+Energy integration, operating-time fractions, save/clock rollover and sequence
+rollover are also checked. The fake FRAM retains bytes across simulated restarts;
+it models partial writes and API failures, not electrical SPI behavior.
+Debug-page tests cover the bool-controlled page cycle, missing INA228/FRAM,
+cached device IDs, restore/save/error states, and rendering without storage I/O.
+Reset tests cover the ten-second threshold, cancellation during release debounce,
+flashing text, confirmation duration, one reset per hold, restart durability,
+failed-save retry, unavailable FRAM and unsigned clock rollover.
+See [validation results and manual checks](../docs/FRAM_VALIDATION.md).
 
 ## Arduino IDE deployment
 

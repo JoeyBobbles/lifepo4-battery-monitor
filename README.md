@@ -13,9 +13,10 @@ and drives an SH1106 128 × 64 I²C OLED.
 - Reports readings and capacity estimates at 9600 baud and displays an error
   if the INA228 is absent at startup.
 
-Capacity starts at an assumed **100% on every boot** and is not persisted.
-It is a session estimate, not a measured state of charge. Current smoothing is
-implemented, but runtime estimates are not output to either display or serial.
+Capacity resumes from the last valid SPI FRAM record. Without valid saved state,
+it starts at an assumed **100%**. It remains an estimate, not a measured state of
+charge. Current smoothing is implemented, but runtime estimates are not output
+to either display or serial.
 
 ## Hardware
 
@@ -27,7 +28,7 @@ implemented, but runtime estimates are not output to either display or serial.
 | Momentary push button | D3 to ground, using the internal pull-up |
 | 5 V buck converter | Regulated Nano supply |
 | Two 12.8 V, 8 Ah LiFePO4 batteries in parallel | 16 Ah nominal bank |
-| SPI FRAM breakout, 64 Kbit | Shown in schematic; firmware support is planned |
+| Adafruit SPI FRAM breakout, 64 Kbit (8 KB) | Saves consumed Ah, Wh and operating seconds |
 
 The 10 A calibration setting is not a verified safe continuous-current rating.
 Confirm the actual breakout, shunt rating, signal levels, supply current and
@@ -69,7 +70,7 @@ Install [Arduino CLI](https://docs.arduino.cc/arduino-cli/installation/)
 ```sh
 arduino-cli core update-index
 arduino-cli core install arduino:avr@1.8.8
-arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4"
+arduino-cli lib install "U8g2@2.36.19" "Adafruit INA228 Library@3.0.0" "Adafruit BusIO@1.17.4" "Adafruit FRAM SPI@2.6.2"
 arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 arduino-cli board list
 arduino-cli upload --port /dev/ttyUSB0 --fqbn arduino:avr:nano:cpu=atmega328 firmware
@@ -83,7 +84,92 @@ additional tabs, headers and source files are included automatically.
 In Arduino IDE, install **Arduino AVR Boards**, select **Arduino Nano** and
 **ATmega328P**, install the listed libraries through Library Manager, open the
 sketch, select the serial port, verify, then upload. `Arduino.h`, Wire and SPI
-come with the AVR core; BusIO is required by INA228. No FRAM library is needed.
+come with the AVR core; BusIO is required by INA228 and FRAM.
+
+## FRAM wiring and persistence
+
+Connect the Adafruit 64 Kbit SPI FRAM module as follows. Keep the existing I²C
+connections and D3 page button unchanged; all circuits share ground.
+
+| FRAM | Nano |
+| --- | --- |
+| VCC | 5V |
+| GND | GND |
+| SCK | D13 |
+| MISO | D12 |
+| MOSI | D11 |
+| CS | D10 |
+| WP | 5V |
+| HOLD | 5V |
+
+Startup makes one FRAM initialisation attempt. An unavailable device or startup
+read error is reported over Serial and disables persistence for that boot;
+voltage/current monitoring continues. With no FRAM, counters begin at zero.
+Both 28-byte records (addresses 0 and 28) are checked for magic, version, CRC-32
+and plausible counters. The newest valid sequence is restored. If both records
+are invalid, including arbitrary factory contents, zero counters are saved.
+A read transport failure does not cause existing storage to be overwritten.
+
+Changed counters save about once per second using `millis()`. Operating time
+counts powered-on loop time, including when the INA228 is missing, so it normally
+makes each second's record different even at zero load. Identical counters skip
+writing. Ah uses the existing signed trapezoidal integration and 0–16 Ah clamp;
+Wh integrates voltage × signed current, subtracts charging, and is clamped at zero.
+Operating seconds saturate at the 32-bit maximum (about 136 years).
+
+Saves alternate slots: invalidate the older slot, verify invalidation, write its
+payload, then commit its magic identifier last. The previous active slot stays
+intact. Library return values and a full readback/CRC comparison must succeed
+before acknowledging the new record; failed saves are logged and retried at the
+next save interval. Sequence ordering handles 32-bit rollover. The storage format
+is versioned and targets the Nano's little-endian, 32-bit float representation.
+
+A power cut can lose roughly the last second of counters, plus any interval of
+failed saves and the fractional operating second. Recovery can fall back further
+if a record is corrupt. The first measurement after restart seeds integration;
+no powered-off interval is counted. Consumption while the monitor is off cannot
+be measured. SPI readback detects many failures but is not a hardware write
+acknowledgement or a guarantee against brownouts, bus faults or CRC collisions.
+
+### Reset metrics
+
+Hold D3 for **10 seconds** to reset consumed Ah, consumed Wh, accumulated operating
+time and session uptime. Capacity returns to **16 Ah / 100% assumed full**; only
+use this when you intend to mark the battery full. A short press still changes
+pages immediately. After one second of holding, the OLED shows a countdown,
+flashing `HOLD TO RESET` and `Release to cancel`. Releasing before ten seconds
+cancels the reset. Monitoring and periodic saves continue during the countdown.
+
+At ten seconds the display shows `METRICS RESET` and the FRAM result. Reset values
+are saved immediately with readback verification. `FRAM saved` confirms success;
+`FRAM save pending` means the reset happened in RAM and the normal save timer will
+retry. With no FRAM it shows `FRAM unavailable`; a reset cannot then be guaranteed
+to survive restart. Losing power before a successful save can restore old counters.
+Confirmation remains while held and for three seconds after release. Holding
+longer does not reset repeatedly. Consumption and operating time resume from zero;
+the first post-reset sample seeds integration. Live voltage/current/power remain
+available and the existing pages retain their layout.
+
+### FRAM debug page
+
+`bool enableFramDebugPage = true;` near the top of `firmware/firmware.ino` enables
+an additional page: live → capacity → FRAM debug → live. Set it to `false` to
+restore the two-page cycle. It is enabled by default for troubleshooting, and
+can be reached even if the INA228 or FRAM is missing.
+
+The page shows initialisation/read/save failures, restored or verified-save state,
+cached manufacturer/product IDs in hexadecimal, the active slot/sequence, and time
+since the last verified save this boot. For the MB85RS64V, the expected ID is
+`4 / 302`; other supported variants may differ. `Slot: none` and `Saved: not this
+boot` mean there is no acknowledged record or verified write respectively.
+`Restored / ready` means a valid record was loaded, without claiming it was written
+this boot. A save failure keeps the last good record details visible.
+
+Drawing this page only uses cached diagnostics. It does not probe SPI or measure
+FRAM supply voltage; status reflects the latest operation. Initialisation failure
+leaves persistence disabled until reboot. Test the actual FRAM VCC and wiring to
+establish the cause of a detection failure. See [issue #4 validation](docs/FRAM_VALIDATION.md) for simulated
+results, memory use and outstanding bench checks.
 
 ## Firmware tests
 
@@ -101,12 +187,12 @@ See [test instructions and coverage limits](tests/README.md).
 ## Limitations and planned work
 
 The monitor cannot protect or disconnect the battery. Capacity is clamped to
-0–16 Ah and loses all history on reboot. It assumes the starting charge and
-current direction/calibration are correct. Voltage readings alone do not
+0–16 Ah; restoration requires a valid FRAM record. It assumes the starting charge
+and current direction/calibration are correct. Voltage readings alone do not
 establish LiFePO4 state of charge. Measurements and hardware ratings still need
 bench validation; compilation is not an electrical safety check.
 
-Planned: FRAM persistence, a capacity reset control, a displayed runtime estimate,
+Planned: a displayed runtime estimate,
 and verified final wiring, calibration and enclosure documentation. The KiCad
 breadboard schematic and SVG already exist; they are not a production PCB design.
 
