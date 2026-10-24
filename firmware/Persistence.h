@@ -28,6 +28,13 @@ static_assert(sizeof(PersistedState) == 28 &&
 
 Adafruit_FRAM_SPI fram(CS_PIN);
 bool available = false;
+enum class Status : uint8_t { NotStarted, InitFailed, ReadFailed, Restored, Saved, SaveFailed, InvalidCounters };
+Status status = Status::NotStarted;
+uint8_t manufacturerID = 0;
+uint16_t productID = 0;
+bool deviceIDRead = false;
+bool hasWritten = false;
+unsigned long lastSuccessfulSave = 0;
 uint8_t activeSlot = 1;
 PersistedState saved = {};
 unsigned long lastSaveAttempt = 0;
@@ -66,7 +73,11 @@ bool save(float consumedAh, float consumedWh, uint32_t operatingSeconds) {
   PersistedState next = {MAGIC, VERSION, 0, saved.sequence + 1,
                         consumedAh, consumedWh, operatingSeconds, 0};
   next.checksum = checksum(next);
-  if (!available || !valid(next)) return false;
+  if (!available) return false;
+  if (!valid(next)) {
+    status = Status::InvalidCounters;
+    return false;
+  }
   uint8_t target = 1 - activeSlot;
   uint32_t address = target * sizeof(next);
   uint32_t invalidMagic = 0;
@@ -83,20 +94,30 @@ bool save(float consumedAh, float consumedWh, uint32_t operatingSeconds) {
   ok = ok && readSlot(target, verified) && valid(verified) &&
        memcmp(&next, &verified, sizeof(next)) == 0;
   if (!ok) {
+    status = Status::SaveFailed;
     Serial.println(F("ERROR: FRAM save failed; will retry"));
     return false;
   }
   activeSlot = target;
   saved = next;
+  status = Status::Saved;
+  hasWritten = true;
+  lastSuccessfulSave = millis();
   return true;
 }
 
 void begin(float& consumedAh, float& consumedWh, uint32_t& operatingSeconds) {
   available = fram.begin(); // One bounded attempt, no polling or delays.
+  manufacturerID = 0;
+  productID = 0;
+  deviceIDRead = fram.getDeviceID(&manufacturerID, &productID);
+  hasWritten = false;
+  lastSuccessfulSave = 0;
   activeSlot = 1;
   saved = {};
   lastSaveAttempt = millis();
   if (!available) {
+    status = Status::InitFailed;
     Serial.println(F("ERROR: FRAM initialisation failed; persistence disabled"));
     return;
   }
@@ -104,6 +125,7 @@ void begin(float& consumedAh, float& consumedWh, uint32_t& operatingSeconds) {
   // A transport error is not evidence of blank memory: do not overwrite it.
   if (!readSlot(0, first) || !readSlot(1, second)) {
     available = false;
+    status = Status::ReadFailed;
     Serial.println(F("ERROR: FRAM read failed; persistence disabled"));
     return;
   }
@@ -117,6 +139,7 @@ void begin(float& consumedAh, float& consumedWh, uint32_t& operatingSeconds) {
     consumedAh = saved.consumedAh;
     consumedWh = saved.consumedWh;
     operatingSeconds = saved.operatingSeconds;
+    status = Status::Restored;
     Serial.println(F("FRAM counters restored"));
   } else {
     consumedAh = consumedWh = 0;

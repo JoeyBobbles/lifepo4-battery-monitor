@@ -19,6 +19,9 @@ Adafruit_INA228 ina228;
 // Hardware
 constexpr uint8_t BUTTON_PIN = 3;
 
+// Include a third OLED page for FRAM troubleshooting. Set false to hide it.
+bool enableFramDebugPage = true;
+
 // Battery bank: 2 x 12.8V 8Ah LiFePO4 in parallel
 constexpr float BATTERY_CAPACITY_AH = 16.0f;
 
@@ -134,7 +137,7 @@ void handleButton() {
 
       // One page change per press
       if (stableButtonState == LOW) {
-        currentPage = (currentPage + 1) % 2;
+        currentPage = (currentPage + 1) % (enableFramDebugPage ? 3 : 2);
 
         Serial.print(F("Page: "));
         Serial.println(currentPage + 1);
@@ -356,17 +359,61 @@ void drawCapacityPage() {
 // Display
 // =====================================================
 
+void drawFramDebugPage() {
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 9);
+  u8g2.print(F("FRAM DEBUG"));
+  u8g2.setCursor(0, 20);
+  switch (persistence::status) {
+    case persistence::Status::NotStarted: u8g2.print(F("Not started")); break;
+    case persistence::Status::InitFailed: u8g2.print(F("INIT FAILED")); break;
+    case persistence::Status::ReadFailed: u8g2.print(F("READ FAILED")); break;
+    case persistence::Status::Restored: u8g2.print(F("Restored / ready")); break;
+    case persistence::Status::Saved: u8g2.print(F("Save verified")); break;
+    case persistence::Status::SaveFailed: u8g2.print(F("SAVE FAILED / retry")); break;
+    case persistence::Status::InvalidCounters: u8g2.print(F("Invalid counters")); break;
+  }
+  u8g2.setCursor(0, 31);
+  u8g2.print(F("ID: "));
+  if (persistence::deviceIDRead) {
+    u8g2.print(persistence::manufacturerID, HEX);
+    u8g2.print(F(" / "));
+    u8g2.print(persistence::productID, HEX);
+  } else {
+    u8g2.print(F("read failed"));
+  }
+  u8g2.setCursor(0, 42);
+  u8g2.print(F("Slot: "));
+  bool hasRecord = persistence::saved.magic == persistence::MAGIC;
+  if (hasRecord) u8g2.print(persistence::activeSlot);
+  else u8g2.print(F("none"));
+  u8g2.setCursor(0, 53);
+  u8g2.print(F("Seq: "));
+  if (hasRecord) u8g2.print(persistence::saved.sequence);
+  else u8g2.print(F("none"));
+  u8g2.setCursor(0, 63);
+  u8g2.print(F("Saved: "));
+  if (persistence::hasWritten) {
+    u8g2.print((millis() - persistence::lastSuccessfulSave) / 1000);
+    u8g2.print(F("s ago"));
+  } else {
+    u8g2.print(F("not this boot"));
+  }
+}
+
 void drawDisplay() {
   u8g2.firstPage();
 
   do {
-    if (!sensorAvailable) {
+    if (enableFramDebugPage && currentPage == 2) {
+      drawFramDebugPage();
+    } else if (!sensorAvailable) {
       u8g2.setFont(u8g2_font_6x10_tr);
       u8g2.drawStr(0, 20, "INA228 NOT FOUND");
-    } else if (currentPage == 0) {
-      drawLivePage();
-    } else {
+    } else if (currentPage == 1) {
       drawCapacityPage();
+    } else {
+      drawLivePage();
     }
 
   } while (u8g2.nextPage());

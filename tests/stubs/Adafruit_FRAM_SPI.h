@@ -20,6 +20,11 @@ struct Adafruit_FRAM_SPI {
   int begins = 0;
   explicit Adafruit_FRAM_SPI(int8_t) { memory.fill(0xA5); }
   bool begin(uint8_t = 2) { ++begins; return present; }
+  bool getDeviceID(uint8_t* manufacturer, uint16_t* product) {
+    *manufacturer = present ? 0x04 : 0xFF;
+    *product = present ? 0x0302 : 0xFFFF;
+    return !readFailure;
+  }
   bool writeEnable(bool value) {
     if (!present || enableFailure) return false;
     enabled = value;

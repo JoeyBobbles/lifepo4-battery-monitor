@@ -33,6 +33,7 @@ void reset() {
   persistence::lastSaveAttempt = 0;
   usedWh = previousSignedPower = 0;
   operatingSeconds = operatingRemainderMs = lastOperatingUpdate = 0;
+  enableFramDebugPage = false;
   currentPage = 0;
   startTime = lastUpdate = lastMeasurement = lastDebounceTime = 0;
   lastButtonReading = stableButtonState = HIGH;
@@ -448,9 +449,76 @@ void persistenceClockWrap() {
   require(persistence::saved.sequence == 0, "wrapped sequence is newest");
 }
 
+void framDebugPage() {
+  enableFramDebugPage = true;
+  setup();
+  button(100, LOW);
+  button(151, LOW);
+  button(200, HIGH);
+  button(251, HIGH);
+  button(300, LOW);
+  button(351, LOW);
+  require(currentPage == 2, "debug enabled adds third page");
+  require(u8g2.text.find("FRAM DEBUG") != std::string::npos &&
+          u8g2.text.find("Save verified") != std::string::npos, "verified save shown");
+  require(persistence::deviceIDRead && persistence::manufacturerID == 4 &&
+          persistence::productID == 0x0302, "device ID cached");
+  int reads = persistence::fram.reads;
+  int writes = persistence::fram.writes;
+  drawDisplay();
+  require(persistence::fram.reads == reads && persistence::fram.writes == writes,
+          "debug rendering must not access FRAM");
+  enableFramDebugPage = false;
+  drawDisplay();
+  require(u8g2.text.find("FRAM DEBUG") == std::string::npos, "disabled debug hidden");
+  enableFramDebugPage = true;
+  persistence::fram.writeFailure = true;
+  require(!persistence::save(1, 1, 1), "inject failed save");
+  drawDisplay();
+  require(u8g2.text.find("SAVE FAILED") != std::string::npos, "failed save shown");
+  persistence::fram.writeFailure = false;
+  require(persistence::save(1, 1, 1), "save recovers");
+  drawDisplay();
+  require(u8g2.text.find("Save verified") != std::string::npos, "recovery shown");
+  button(400, HIGH);
+  button(451, HIGH);
+  button(500, LOW);
+  button(551, LOW);
+  require(currentPage == 0, "debug page cycles back to live");
+}
+
+void framDebugFailures() {
+  persistence::fram.present = false;
+  ina228.present = false;
+  setup();
+  enableFramDebugPage = true;
+  currentPage = 2;
+  drawDisplay();
+  require(u8g2.text.find("INIT FAILED") != std::string::npos, "debug works with missing INA and FRAM");
+  require(u8g2.text.find("Slot: none") != std::string::npos &&
+          u8g2.text.find("not this boot") != std::string::npos, "no record or successful writes");
+  reset();
+  persistence::fram.readFailure = true;
+  setup();
+  enableFramDebugPage = true;
+  currentPage = 2;
+  drawDisplay();
+  require(u8g2.text.find("READ FAILED") != std::string::npos &&
+          u8g2.text.find("ID: read failed") != std::string::npos, "read failure distinguished");
+  reset();
+  setup();
+  restart();
+  enableFramDebugPage = true;
+  currentPage = 2;
+  drawDisplay();
+  require(u8g2.text.find("Restored / ready") != std::string::npos &&
+          u8g2.text.find("not this boot") != std::string::npos, "restore is not a verified write this boot");
+}
+
 int main() {
   struct Test { const char* name; void (*run)(); };
   const Test tests[] = {
+    {"FRAM debug page", framDebugPage}, {"FRAM debug failures", framDebugFailures},
     {"blank FRAM", blankFram}, {"periodic persistence and restart", periodicPersistence},
     {"slot corruption", slotCorruption}, {"record validation", recordValidation},
     {"interrupted writes at every byte", interruptedWrites}, {"FRAM failures and retry", framFailures},

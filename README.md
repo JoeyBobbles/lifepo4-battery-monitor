@@ -134,7 +134,27 @@ acknowledgement or a guarantee against brownouts, bus faults or CRC collisions.
 There is no battery counter reset control; D3 still only changes pages. No new
 reset gesture is introduced. The OLED continues to show session uptime and the
 existing pages; Wh and accumulated operating seconds are stored without adding
-new display pages. See [issue #4 validation](docs/FRAM_VALIDATION.md) for simulated
+new consumption display pages.
+
+### FRAM debug page
+
+`bool enableFramDebugPage = true;` near the top of `firmware/firmware.ino` enables
+an additional page: live → capacity → FRAM debug → live. Set it to `false` to
+restore the two-page cycle. It is enabled by default for troubleshooting, and
+can be reached even if the INA228 or FRAM is missing.
+
+The page shows initialisation/read/save failures, restored or verified-save state,
+cached manufacturer/product IDs in hexadecimal, the active slot/sequence, and time
+since the last verified save this boot. For the MB85RS64V, the expected ID is
+`4 / 302`; other supported variants may differ. `Slot: none` and `Saved: not this
+boot` mean there is no acknowledged record or verified write respectively.
+`Restored / ready` means a valid record was loaded, without claiming it was written
+this boot. A save failure keeps the last good record details visible.
+
+Drawing this page only uses cached diagnostics. It does not probe SPI or measure
+FRAM supply voltage; status reflects the latest operation. Initialisation failure
+leaves persistence disabled until reboot. Test the actual FRAM VCC and wiring to
+establish the cause of a detection failure. See [issue #4 validation](docs/FRAM_VALIDATION.md) for simulated
 results, memory use and outstanding bench checks.
 
 ## Firmware tests

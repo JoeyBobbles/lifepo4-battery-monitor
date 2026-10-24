@@ -9,6 +9,7 @@
 constexpr bool HIGH = true;
 constexpr bool LOW = false;
 constexpr int INPUT_PULLUP = 2;
+constexpr int HEX = 16;
 #define F(text) text
 
 namespace fake {

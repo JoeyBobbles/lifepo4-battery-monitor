@@ -25,7 +25,7 @@ persistence instead of treating unreadable storage as empty.
 
 ## Automated results
 
-`bash tests/run.sh`: **23 cases passed**, including the original 14 cases.
+`bash tests/run.sh`: **25 cases passed**, including the original 14 cases.
 The harness includes the real sketch and storage logic with simulated hardware.
 
 | Acceptance scenario | Simulated result |
@@ -42,6 +42,7 @@ The harness includes the real sketch and storage logic with simulated hardware.
 | Initial zero-state save fails | Zero counters are retried after 1 s even without changed values |
 | Timer and sequence wrap | Save/operating timers and uint32 sequence rollover pass |
 | Wh and operating time | Signed charge/discharge Wh, zero clamp, fractional time, missing sensor and saturation pass |
+| Optional FRAM debug page | Three-page cycle when enabled, hidden when disabled; reachable without INA228; cached ID/status, failures and recovery shown without FRAM I/O during drawing |
 | Reset then restart | Not applicable: no reset control exists |
 
 The host uses its native `unsigned long`, potentially 64 bits; rollover tests
@@ -61,9 +62,9 @@ arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 | Build | Flash (30,720 bytes available) | Static SRAM (2,048 bytes available) |
 | --- | --- | --- |
 | `origin/main` baseline, `6b3ad58` | 24,146 bytes (78%) | 1,023 bytes (49%) |
-| Issue #4 implementation | 27,658 bytes (90%) | 1,181 bytes (57%) |
+| Issue #4 with debug page enabled | 28,664 bytes (93%) | 1,191 bytes (58%) |
 
-Both builds pass. The implementation leaves **867 bytes for stack and heap**.
+Both builds pass. The implementation leaves **857 bytes for stack and heap**.
 There are no application allocations or `String` objects. The Adafruit libraries
 allocate their device objects internally; static SRAM reports exclude these
 allocations and the call stack. Storage logic uses small fixed-size records;
