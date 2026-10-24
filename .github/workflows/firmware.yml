@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    name: Test firmware logic
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run host tests
+        run: bash tests/run.sh
+
   compile:
     name: Compile Nano firmware
     runs-on: ubuntu-latest

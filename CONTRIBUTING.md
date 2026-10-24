@@ -17,6 +17,8 @@ arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328 firmware
 ```
 
 Use the dependencies and installation commands in [README.md](README.md).
+Run `bash tests/run.sh` to check firmware logic on a computer with a C++17
+compiler; see [the test documentation](tests/README.md) for coverage and limits.
 The pull request's `Compile Nano firmware` check must pass. Compilation alone
 does not validate readings, timing, memory use under load or electrical safety;
 describe relevant bench testing when changing these behaviours.
