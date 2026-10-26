@@ -128,3 +128,21 @@ $RECYCLE.BIN/
 .aws/
 .codex/
 .agents/
+
+# FreeCAD Files
+# FreeCAD automatic backups
+*.FCStd1
+*.FCStd2
+*.FCStd3
+*.FCStd[0-9]*
+*.FCBak
+
+# FreeCAD temporary files
+*.FCStd.tmp
+*.FCStd.lock
+*.tmp
+
+# Editor and OS files
+*~
+.DS_Store
+Thumbs.db
